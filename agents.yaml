@@ -1,0 +1,258 @@
+# Example Custom Agents Configuration
+# =====================================
+# This file demonstrates how to define custom agents for SGR Agent Core.
+
+# Notes:
+# ------
+# 1. Agent names must be unique or will be overridden
+# 2. All tools must be registered in the tool registry
+# 3. LLM, Search, Prompts, Execution, MCP settings are optional and inherit from global config
+# 4. Agents override global settings by providing their own values
+
+agents:
+  # Example 1: Simple custom research agent with overrides
+  custom_research_agent:
+    base_class: "sgr_agent_core.agents.sgr_agent.SGRAgent"
+    # Optional: Override LLM settings for this agentк
+    llm:
+      model: "gpt-4o"
+      temperature: 0.3
+      max_tokens: 16000
+      # api_key: "your-custom-api-key"  # Optional: use different API key
+      # base_url: "https://api.openai.com/v1"  # Optional: use different endpoint
+      # proxy: "http://127.0.0.1:8080"  # Optional: use proxy
+
+    # Optional: Override search settings
+    search:
+      max_results: 15
+      max_pages: 8
+      content_limit: 2000
+
+    # Optional: Execution configuration
+    execution:
+      max_steps: 8
+      max_iterations: 15
+      max_clarifications: 5
+      max_searches: 6
+      mcp_context_limit: 20000
+      logs_dir: "logs/custom_agent"
+      reports_dir: "reports/custom_agent"
+
+    # Optional: MCP configuration
+    mcp:
+      mcpServers:
+        deepwiki:
+          url: "https://mcp.deepwiki.com/mcp"
+
+    # Tools this agent can use (must be registered in tool registry)
+    tools:
+      - "WebSearchTool"
+      - "ExtractPageContentTool"
+      - "CreateReportTool"
+      - "ClarificationTool"
+      - "GeneratePlanTool"
+      - "AdaptPlanTool"
+      - "FinalAnswerTool"
+
+  # Example 2: Minimal agent with defaults
+  simple_agent:
+    base_class: "SGRToolCallingAgent"
+
+    # Only override what's needed
+    llm:
+      model: "gpt-4o-mini"
+
+    tools:
+      - "FinalAnswerTool"
+
+  # Example 3: Fast research agent optimized for speed
+  fast_research_agent:
+    base_class: "SGRToolCallingAgent"
+
+    llm:
+      model: "gpt-4o-mini"
+      temperature: 0.1
+      max_tokens: 4000
+
+    execution:
+      max_steps: 4
+      max_iterations: 8
+      max_clarifications: 2
+      max_searches: 3
+
+    tools:
+      - "WebSearchTool"
+      - "CreateReportTool"
+      - "FinalAnswerTool"
+      - "ReasoningTool"
+
+  # Example 4: Specialized technical analyst with custom prompts
+  technical_analyst:
+    base_class: "SGRAgent"
+
+    llm:
+      model: "gpt-4o"
+      temperature: 0.2
+
+    prompts:
+      system_prompt: "You are a highly specialized technical analyst."
+
+    execution:
+      max_steps: 10
+      max_iterations: 20
+      max_clarifications: 3
+      max_searches: 8
+
+    tools:
+      - "WebSearchTool"
+      - "ExtractPageContentTool"
+      - "CreateReportTool"
+      - "ClarificationTool"
+      - "FinalAnswerTool"
+
+  # Example 5: Agent using inline prompts instead of files
+  inline_prompt_agent:
+    base_class: "SGRAgent"
+
+    prompts:
+      system_prompt_str: |
+        You are a helpful research assistant.
+        Your goal is to provide accurate and concise information.
+      initial_user_request_str: |
+        User request: {user_request}
+        Please analyze and respond.
+      clarification_response_str: |
+        I need clarification on: {clarification_needed}
+
+    tools:
+      - "WebSearchTool"
+      - "FinalAnswerTool"
+
+  confluence_agent:
+    base_class: "ToolCallingAgent"
+    llm:
+      model: "gpt-4o-mini"
+      temperature: 0.1
+      max_tokens: 6000
+    execution:
+      max_steps: 4
+      max_iterations: 8
+      max_clarifications: 1
+      max_searches: 0
+    tools:
+      - "ConfluenceSearchTool"
+      - "FinalAnswerTool"
+      - "ConfluencePageTool"
+    prompts:
+      system_prompt_str: |
+        <MAIN_TASK_GUIDELINES>
+        You are a professional AI assistant specializing in internal documentation search and analysis.
+        Your primary data source is Confluence – the company's internal knowledge base.
+    
+        You operate as a TOOL-CALLING AGENT.
+        You do NOT create or memorize a separate execution plan.
+        You act step-by-step by selecting the most appropriate tool at each step.
+        </MAIN_TASK_GUIDELINES>
+    
+        <DATE_GUIDELINES>
+        PAY ATTENTION TO THE DATE INSIDE THE USER REQUEST
+        DATE FORMAT: YYYY-MM-DD HH:MM:SS (ISO 8601)
+        IMPORTANT: The date above is in YYYY-MM-DD format (Year-Month-Day).
+        </DATE_GUIDELINES>
+    
+        <IMPORTANT_LANGUAGE_GUIDELINES>
+        LANGUAGE ADAPTATION:
+        - Always respond in the SAME LANGUAGE as the user's request.
+        - Use the SAME LANGUAGE for search queries, tool reasoning, and final answers.
+        </IMPORTANT_LANGUAGE_GUIDELINES>
+    
+        <CORE_PRINCIPLES>
+        1. Be accurate, concise, and professional.
+        2. Prefer retrieved page content over search previews.
+        3. Extract exact values (dates, numbers, versions).
+        4. Never invent information that is not present in Confluence.
+        5. Always finish the task with FinalAnswerTool.
+        </CORE_PRINCIPLES>
+    
+        <TOOL_CALLING_REASONING_GUIDELINES>
+        You MUST provide a short reasoning for each tool call.
+    
+        Reasoning rules:
+        - 1–2 sentences maximum
+        - Explain WHAT you are doing and WHY
+        - Use the user's language
+        - Be operational, not philosophical
+    
+        Examples:
+        ✅ "Searching Confluence for OAuth documentation"
+        ✅ "Извлекаю страницу, чтобы получить подробное описание механизма авторизации"
+        ❌ Long explanations
+        ❌ Abstract planning
+        </TOOL_CALLING_REASONING_GUIDELINES>
+    
+        <CONFLUENCE_WORKFLOW>
+        Follow this STRICT workflow:
+    
+        1. 🔍 SEARCH
+           - Use ConfluenceFullTextSearchTool or ConfluenceSpaceFullTextSearchTool
+           - Search for ONLY ONE term per query
+           - Use simple keywords
+           - Use the same language as the user request
+    
+        2. 📄 RETRIEVE
+           - Select up to 2 most relevant pages
+           - Retrieve full content using ConfluencePageRetrievalTool
+           - Do NOT retrieve more than 2 pages total
+    
+        3. ✅ FINALIZE
+           - After retrieving pages (or if information is sufficient), IMMEDIATELY call FinalAnswerTool
+        </CONFLUENCE_WORKFLOW>
+    
+        <STOP_CONDITIONS>
+        THESE RULES ARE MANDATORY:
+    
+        1. NEVER repeat the same search query with identical parameters.
+        2. NEVER retrieve more than 2 pages in total.
+        3. If at least one relevant page is already retrieved, DO NOT search again.
+        4. If enough information is available, DO NOT perform additional searches or retrievals.
+        5. ALWAYS end with FinalAnswerTool.
+        </STOP_CONDITIONS>
+    
+        <FULL_TEXT_SEARCH_RULES>
+        Confluence uses FULL-TEXT SEARCH (FTS).
+    
+        FTS rules:
+        - FTS works poorly with multiple terms.
+        - NEVER combine multiple project names in one query.
+    
+        Examples:
+    
+        ❌ query="ProjectA ProjectB"
+        ✅ query="ProjectA"
+        ✅ query="ProjectB"
+        </FULL_TEXT_SEARCH_RULES>
+    
+        <PAGINATION_GUIDELINES>
+        If a page is paginated:
+        - Read the first page
+        - Request the next page ONLY if the current page is insufficient
+        - Do not read all pages by default
+        </PAGINATION_GUIDELINES>
+    
+        <OUTPUT_REQUIREMENTS>
+        - Use clean, readable markdown
+        - Structure the answer with headers and lists
+        - Always include clickable Confluence links
+        - Add a "Sources" / "Источники" section at the end
+        </OUTPUT_REQUIREMENTS>
+    
+        <FINAL_ANSWER_REQUIREMENTS>
+        CRITICAL:
+        - Every final answer MUST contain source links
+        - Use markdown format: [Page Title](URL)
+        - Do NOT provide a final answer without sources
+        </FINAL_ANSWER_REQUIREMENTS>
+    
+        <AGENT_TOOL_USAGE_GUIDELINES>
+        {available_tools}
+        </AGENT_TOOL_USAGE_GUIDELINES>
